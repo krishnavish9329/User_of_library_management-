@@ -31,5 +31,9 @@ export const createPrismaUserRepository = (): IUserRepository => {
     return createUser(record);
   };
 
-  return { findByEmail, findById, save };
+  const updatePasswordHash = async (userId: string, passwordHash: string): Promise<void> => {
+    await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  };
+
+  return { findByEmail, findById, save, updatePasswordHash };
 };
