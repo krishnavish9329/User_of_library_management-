@@ -20,6 +20,14 @@ export interface AuthController {
 // Identical response whether or not the email exists (prevents account enumeration).
 const FORGOT_PASSWORD_MESSAGE = "If an account exists for this email, a password reset link has been sent.";
 
+/** Log karne ke liye body ka copy — password fields ko hamesha mask karte hain. */
+const redact = (data: Record<string, unknown>): Record<string, unknown> => {
+  const copy = { ...data };
+  if ("password" in copy) copy.password = "***";
+  if ("newPassword" in copy) copy.newPassword = "***";
+  return copy;
+};
+
 /**
  * Factory function replacing the old `AuthController` class.
  * Dependencies are passed in as arguments and captured via closure,
@@ -33,18 +41,23 @@ export const createAuthController = (
 ): AuthController => {
   const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      console.log("[register] request:", redact(req.body as Record<string, unknown>));
       const validatedData = RegisterSchema.parse(req.body);
       const result = await registerUseCase.execute(validatedData);
+      console.log("[register] success:", { id: result.id, email: result.email, role: result.role });
       res.status(201).json({ success: true, data: result });
     } catch (error) {
+      console.error("[register] failed:", error instanceof Error ? error.message : error);
       next(error);
     }
   };
 
   const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      console.log("[login] request:", redact(req.body as Record<string, unknown>));
       const validatedData = LoginSchema.parse(req.body);
       const { tokens, user } = await loginUseCase.execute(validatedData);
+      console.log("[login] success:", { id: user.id, email: user.email, role: user.role });
 
       // Secure HTTP-Only Cookie for Refresh Token
       res.cookie("refreshToken", tokens.refreshToken, {
@@ -60,12 +73,14 @@ export const createAuthController = (
         user,
       });
     } catch (error) {
+      console.error("[login] failed:", error instanceof Error ? error.message : error);
       next(error);
     }
   };
 
   const forgotPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      console.log("[forgot-password] request:", req.body);
       const dto = ForgotPasswordSchema.parse(req.body);
 
       // Answer immediately, then do the DB + email work in the background.
@@ -75,7 +90,15 @@ export const createAuthController = (
 
       void forgotPasswordUseCase
         .execute(dto)
-        .catch((err) => console.error("[forgot-password] failed:", err instanceof Error ? err.message : err));
+        .then(() => console.log("[forgot-password] background work done for", dto.email))
+        .catch((err) =>
+          console.error(
+            "[forgot-password] failed for",
+            dto.email,
+            ":",
+            err instanceof Error ? err.stack || err.message : err
+          )
+        );
     } catch (error) {
       next(error);
     }
@@ -83,10 +106,13 @@ export const createAuthController = (
 
   const resetPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      console.log("[reset-password] request: token=", req.body.token, "newPassword=***");
       const dto = ResetPasswordSchema.parse(req.body);
       await resetPasswordUseCase.execute(dto);
+      console.log("[reset-password] success: password updated");
       res.status(200).json({ success: true, message: "Password updated. You can now log in." });
     } catch (error) {
+      console.error("[reset-password] failed:", error instanceof Error ? error.message : error);
       next(error);
     }
   };

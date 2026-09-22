@@ -35,6 +35,13 @@ export const createRegisterUserUseCase = (
     });
 
     const savedUser = await userRepository.save(user);
+    console.log("[register] saved to DB:", {
+      id: savedUser.id,
+      email: savedUser.email,
+      firstName: savedUser.firstName,
+      lastName: savedUser.lastName,
+      role: savedUser.role,
+    });
     const { passwordHash: _, ...userWithoutPassword } = savedUser;
     return userWithoutPassword;
   };

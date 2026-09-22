@@ -34,13 +34,20 @@ export const createForgotPasswordUseCase = (
     const email = createEmail(dto.email).getValue();
 
     const user = await userRepository.findByEmail(email);
-    if (!user || !user.id || !user.isActive) return;
+    if (!user || !user.id || !user.isActive) {
+      console.log("[forgot-password] no active user for:", email, "(silently skipping)");
+      return;
+    }
 
     const now = new Date();
 
     // Cooldown: stops someone from mail-bombing a user through this endpoint.
     const lastIssuedAt = await tokenRepository.findLatestCreatedAt(user.id);
     if (lastIssuedAt && now.getTime() - lastIssuedAt.getTime() < config.resendCooldownSeconds * 1000) {
+      const waitedSec = Math.round((now.getTime() - lastIssuedAt.getTime()) / 1000);
+      console.log(
+        `[forgot-password] cooldown active for userId=${user.id}: last link ${waitedSec}s ago (need ${config.resendCooldownSeconds}s) — no email sent`
+      );
       return;
     }
 
@@ -48,13 +55,16 @@ export const createForgotPasswordUseCase = (
     await tokenRepository.invalidateAllForUser(user.id);
 
     const { token, tokenHash } = tokenService.generate();
+    const expiresAt = new Date(now.getTime() + config.tokenTtlMinutes * 60 * 1000);
     await tokenRepository.create({
       userId: user.id,
       tokenHash,
-      expiresAt: new Date(now.getTime() + config.tokenTtlMinutes * 60 * 1000),
+      expiresAt,
     });
+    console.log("[forgot-password] token stored:", { userId: user.id, tokenHash, expiresAt });
 
     const resetLink = `${config.frontendResetUrl}?token=${encodeURIComponent(token)}`;
+    console.log("[forgot-password] reset link:", resetLink);
 
     await emailService.sendPasswordResetEmail({
       to: user.email,
@@ -62,6 +72,7 @@ export const createForgotPasswordUseCase = (
       resetLink,
       expiresInMinutes: config.tokenTtlMinutes,
     });
+    console.log("[forgot-password] email sent to:", user.email);
   };
 
   return { execute };

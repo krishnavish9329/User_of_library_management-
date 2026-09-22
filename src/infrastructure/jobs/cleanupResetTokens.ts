@@ -7,7 +7,10 @@ export const startResetTokenCleanup = (): void => {
   const run = () =>
     prisma.passwordResetToken
       .deleteMany({ where: { expiresAt: { lt: new Date() } } })
-      .catch((err: unknown) => console.error("[cleanup] reset tokens:", err instanceof Error ? err.message : err));
+      .then(({ count }) => console.log(`[cleanup] deleted ${count} expired reset token(s)`))
+      .catch((err: unknown) =>
+        console.error("[cleanup] reset tokens:", err instanceof Error ? err.stack || err.message : err)
+      );
 
   run();
   setInterval(run, SIX_HOURS).unref(); // unref: never keeps the process alive

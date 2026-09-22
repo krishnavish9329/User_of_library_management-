@@ -57,6 +57,7 @@ export const createNodemailerEmailService = (): IEmailService => {
 
   const sendPasswordResetEmail = async ({ to, firstName, resetLink, expiresInMinutes }: PasswordResetEmailParams) => {
     const safeLink = escapeHtml(resetLink);
+    console.log(`[Email] sending password-reset mail to ${to}...`);
     await transporter.sendMail({
       from,
       to,
@@ -78,9 +79,11 @@ export const createNodemailerEmailService = (): IEmailService => {
          <p style="font-size:13px;color:#6b7280">If you did not request this, ignore this email - your password will not change.</p>`
       ),
     });
+    console.log(`[Email] password-reset mail sent to ${to}`);
   };
 
   const sendPasswordChangedEmail = async ({ to, firstName }: PasswordChangedEmailParams) => {
+    console.log(`[Email] sending password-changed mail to ${to}...`);
     await transporter.sendMail({
       from,
       to,
@@ -93,6 +96,7 @@ export const createNodemailerEmailService = (): IEmailService => {
          <p>If this wasn't you, reset your password again immediately and contact support.</p>`
       ),
     });
+    console.log(`[Email] password-changed mail sent to ${to}`);
   };
 
   return { sendPasswordResetEmail, sendPasswordChangedEmail };
